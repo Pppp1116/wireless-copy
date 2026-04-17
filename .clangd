@@ -1,0 +1,19 @@
+CompileFlags:
+  CompilationDatabase: build
+  Remove:
+    - -std=c23
+    - -Wstrict-prototypes
+    - -Wmissing-prototypes
+    - -Wold-style-definition
+    - -Wbad-function-cast
+  Add:
+    - -std=c++23
+
+Diagnostics:
+  ClangTidy:
+    FastCheckFilter: Strict
+  UnusedIncludes: Strict
+  MissingIncludes: None
+
+InlayHints:
+  Enabled: true

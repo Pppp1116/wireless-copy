@@ -1,0 +1,11 @@
+/build/
+/bin/
+/.codex
+
+# CMake and generated compilation database
+/CMakeUserPresets.json
+/compile_commands.json
+
+# Editor and language server caches
+.cache/
+
