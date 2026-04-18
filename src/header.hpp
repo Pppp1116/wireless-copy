@@ -3,6 +3,7 @@
 #include <asio.hpp>
 #include <bit>
 #include <boost/asio.hpp>
+#include <algorithm>
 #include <array>
 #include <cstdint>
 #include <cstdio>
@@ -53,8 +54,21 @@ int file_sender(const std::filesystem::path& path);
 
 namespace Compatability {
 
-constexpr uint64_t host_to_big_u64(uint16_t x);
-constexpr uint64_t big_to_host(uint64_t x);
+constexpr uint64_t host_to_big_u64(uint64_t x) {
+    if constexpr (std::endian::native == std::endian::little) {
+        return std::byteswap(x);
+    } else {
+        return x;
+    }
+}
+
+constexpr uint64_t big_to_host(uint64_t x) {
+    if constexpr (std::endian::native == std::endian::little) {
+        return std::byteswap(x);
+    } else {
+        return x;
+    }
+}
 
 } // namespace Compatability
 

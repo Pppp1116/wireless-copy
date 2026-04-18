@@ -17,9 +17,8 @@ asio::ip::port_type parse_port(const std::string& value) {
 
     return static_cast<asio::ip::port_type>(parsed_port);
 }
-} // namespace
 
-std::vector<std::string> where_to_whisper() {
+std::vector<std::string> read_host_and_port() {
     std::vector<std::string> words;
     words.reserve(2);
 
@@ -36,6 +35,11 @@ std::vector<std::string> where_to_whisper() {
     }
 
     return words;
+}
+} // namespace
+
+std::vector<std::string> where_to_whisper() {
+    return read_host_and_port();
 }
 
 [[nodiscard]] bool send(std::vector<std::string>& words) {
@@ -93,27 +97,65 @@ void clipread() {
     pclose(pipe);
 }
 int file_sender(const std::filesystem::path& path) {
-    (void)path;
-    std::cerr << "file send is not implemented yet\n";
-    return 0;
+    if (!std::filesystem::exists(path)) {
+        std::cerr << "file send failed: path does not exist\n";
+        return -1;
+    }
+
+    if (!std::filesystem::is_regular_file(path)) {
+        std::cerr << "file send failed: path is not a regular file\n";
+        return -2;
+    }
+
+    std::ifstream ffile(path, std::ios::binary);
+    if (!ffile) {
+        std::cerr << "file send failed: could not open file\n";
+        return -3;
+    }
+
+    auto const words = read_host_and_port();
+    if (words.size() < 2) {
+        std::cerr << "missing host or port\n";
+        return -4;
+    }
+
+    try {
+        asio::io_context io;
+        asio::ssl::context ctx(asio::ssl::context::tls_client);
+        ctx.set_default_verify_paths();
+        ctx.set_verify_mode(asio::ssl::verify_none);
+
+        asio::ip::tcp::resolver resolver(io);
+        asio::ssl::stream<asio::ip::tcp::socket> stream(io, ctx);
+
+        auto const port = parse_port(words[1]);
+        auto const endpoints = resolver.resolve(words[0], std::to_string(port));
+
+        asio::connect(stream.next_layer(), endpoints);
+        stream.handshake(asio::ssl::stream_base::client);
+
+        file.name = path.filename().string();
+        file.name_len = Compatability::host_to_big_u64(
+            static_cast<uint64_t>(file.name.size())
+        );
+        file.file_size = Compatability::host_to_big_u64(std::filesystem::file_size(path));
+
+        asio::write(stream, asio::buffer(&file.name_len, sizeof(file.name_len)));
+        asio::write(stream, asio::buffer(file.name.data(), file.name.size()));
+        asio::write(stream, asio::buffer(&file.file_size, sizeof(file.file_size)));
+
+        while (ffile.read(file.buffer.data(), static_cast<std::streamsize>(file.buffer.size()))
+               || ffile.gcount() > 0) {
+            std::size_t const n = static_cast<std::size_t>(ffile.gcount());
+            asio::write(stream, asio::buffer(file.buffer.data(), n));
+        }
+
+        std::cout << "sent " << path << " (" << std::filesystem::file_size(path) << " bytes)\n";
+        return 0;
+    } catch (const std::exception& e) {
+        std::cerr << "file send failed: " << e.what() << '\n';
+        return -5;
+    }
 }
 
 } // namespace Whisper
-
-namespace Compatability {
- constexpr uint64_t host_to_big_u64(uint16_t x) {
-    if constexpr (std::endian::native == std::endian::little) {
-        return std::byteswap(x);
-    } else {
-        return x;
-    }
-}
-constexpr uint64_t big_to_host(uint64_t x) {
-    if constexpr (std::endian::native == std::endian::little) {
-        return std::byteswap(x);
-
-    } else {
-        return x;
-    }
-}
-} // namespace Compatability

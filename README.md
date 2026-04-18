@@ -1,18 +1,20 @@
 # wireless-copy
 
-`wireless-copy` is a small C++ tool for sending clipboard contents between machines over a TLS-protected TCP connection.
+`wireless-copy` is a small C++ tool for sending clipboard contents and files between machines over a TLS-protected TCP connection.
 
 Right now the project supports:
 
 - Listening for remote clipboard text and writing it into the local clipboard
 - Reading the local clipboard and sending it to another machine
+- Receiving a file into a chosen output directory
+- Sending a file to another machine
 - Interactive mode when no arguments are provided
 
 Current limitations:
 
-- File transfer menu options exist, but file send/receive are not implemented yet
 - The CMake project currently builds an executable named `rdbg`
 - The listener expects TLS certificate files at `certs/server.crt` and `certs/server.key`
+- File mode is currently interactive only through menu options `3` and `4`
 
 ## Requirements
 
@@ -58,14 +60,41 @@ Run directly in clipboard send mode:
 ./bin/rdbg whisper
 ```
 
+Menu-driven file modes are also available:
+
+- `3` receives a file
+- `4` sends a file
+
 When prompted:
 
 - `listen` asks for a port number
 - `whisper` asks for `host port`
+- `3` asks for an output directory first, then the listen port
+- `4` asks for a file path first, then `host port`
+
+## File Transfer
+
+To receive a file:
+
+```bash
+./bin/rdbg
+```
+
+Then choose option `3`, enter the destination directory, and enter the port to listen on.
+
+To send a file:
+
+```bash
+./bin/rdbg
+```
+
+Then choose option `4`, enter the path to the file, and enter `host port` for the remote receiver.
+
+The receiver saves the incoming file under its original filename inside the selected destination directory.
 
 ## TLS Certificates
 
-Clipboard listening loads these files relative to the project directory:
+Listener modes load these files relative to the project directory:
 
 - `certs/server.crt`
 - `certs/server.key`
