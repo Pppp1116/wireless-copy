@@ -5,6 +5,7 @@ project(rdbg VERSION 0.1.0 LANGUAGES CXX)
 set(CMAKE_CXX_STANDARD 26)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
+set(CMAKE_COLOR_DIAGNOSTICS ON)
 
 if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
     set(CMAKE_BUILD_TYPE Debug CACHE STRING "Build type" FORCE)
@@ -37,6 +38,7 @@ if(ENABLE_CLANG_TIDY)
     set(CLANG_TIDY_COMMAND
         "${CLANG_TIDY_EXE}"
         "-p=${CMAKE_BINARY_DIR}"
+        "--use-color"
     )
 
     if(EXISTS "${CMAKE_SOURCE_DIR}/.clang-tidy")
@@ -54,11 +56,23 @@ file(GLOB_RECURSE PROJECT_SOURCES CONFIGURE_DEPENDS
     src/*.cxx
 )
 
+file(GLOB_RECURSE PROJECT_HEADERS CONFIGURE_DEPENDS
+    src/*.h
+    src/*.hpp
+    src/*.hh
+    src/*.hxx
+)
+
 if(NOT PROJECT_SOURCES)
     message(FATAL_ERROR "No C++ source files were found under ${CMAKE_SOURCE_DIR}/src")
 endif()
 
-add_executable(${PROJECT_TARGET} ${PROJECT_SOURCES})
+add_executable(${PROJECT_TARGET}
+    ${PROJECT_SOURCES}
+    ${PROJECT_HEADERS}
+)
+
+target_compile_features(${PROJECT_TARGET} PRIVATE cxx_std_26)
 
 target_include_directories(${PROJECT_TARGET} PRIVATE
     "${CMAKE_SOURCE_DIR}/src"
@@ -109,17 +123,28 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
         -fcolor-diagnostics
         -fdiagnostics-show-option
         -fdiagnostics-absolute-paths
-        -ferror-limit=5
         -Wunsafe-buffer-usage
         -Wold-style-cast
         -Wextra-semi
         -Wnon-virtual-dtor
         -Woverloaded-virtual
     )
+elseif(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+    list(APPEND PROJECT_WARNING_FLAGS
+        -fdiagnostics-color=always
+        -fdiagnostics-show-option
+    )
 endif()
 target_compile_options(${PROJECT_TARGET} PRIVATE
     ${PROJECT_WARNING_FLAGS}
     -fstack-protector-strong
+    $<$<CONFIG:Debug>:-fno-omit-frame-pointer>
+)
+
+target_compile_definitions(${PROJECT_TARGET} PRIVATE
+    $<$<AND:$<CONFIG:Debug>,$<CXX_COMPILER_ID:GNU>>:_GLIBCXX_ASSERTIONS>
+    $<$<AND:$<CONFIG:Debug>,$<CXX_COMPILER_ID:Clang>>:_GLIBCXX_ASSERTIONS>
+    $<$<AND:$<CONFIG:Debug>,$<CXX_COMPILER_ID:Clang>>:_LIBCPP_HARDENING_MODE=_LIBCPP_HARDENING_MODE_DEBUG>
 )
 
 if(ENABLE_WARNINGS_AS_ERRORS)

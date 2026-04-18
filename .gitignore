@@ -9,3 +9,4 @@
 # Editor and language server caches
 .cache/
 
+/.vscode/

@@ -1,7 +1,51 @@
+---
 Checks: >
   clang-analyzer-*,
   bugprone-*,
   performance-*,
+  portability-*,
+  readability-*,
   misc-*,
+  cppcoreguidelines-*,
   -misc-include-cleaner,
-  -bugprone-easily-swappable-parameters
+  -bugprone-easily-swappable-parameters,
+  -readability-magic-numbers,
+  -cppcoreguidelines-avoid-magic-numbers,
+  -readability-function-cognitive-complexity,
+  -readability-identifier-length,
+  -bugprone-narrowing-conversions
+
+WarningsAsErrors: ""
+
+CheckOptions:
+  # === misc-const-correctness ===
+  - key:   misc-const-correctness.AnalyzeValues
+    value: true
+  - key:   misc-const-correctness.AnalyzeReferences
+    value: true
+  - key:   misc-const-correctness.AnalyzePointers
+    value: true
+  - key:   misc-const-correctness.WarnPointersAsPointers
+    value: true
+
+  # === readability-make-member-function-const ===
+  - key:   readability-make-member-function-const.IgnoreConstMemberFunctions
+    value: false
+
+  # === cppcoreguidelines ===
+  - key:   cppcoreguidelines-special-member-functions.AllowSoleDefaultDtor
+    value: true
+
+  # === performance ===
+  - key:   performance-inefficient-vector-operation.VectorLikeClasses
+    value: "std::vector;std::basic_string;std::deque;std::list;std::forward_list"
+
+  # === clang-analyzer ===
+  - key:   clang-analyzer-optin.performance.Padding
+    value: true
+
+  # Readability tweaks
+  - key:   readability-implicit-bool-conversion.AllowPointerConditions
+    value: true
+  - key:   readability-implicit-bool-conversion.AllowIntegerConditions
+    value: false
