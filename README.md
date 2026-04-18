@@ -1,0 +1,77 @@
+# wireless-copy
+
+`wireless-copy` is a small C++ tool for sending clipboard contents between machines over a TLS-protected TCP connection.
+
+Right now the project supports:
+
+- Listening for remote clipboard text and writing it into the local clipboard
+- Reading the local clipboard and sending it to another machine
+- Interactive mode when no arguments are provided
+
+Current limitations:
+
+- File transfer menu options exist, but file send/receive are not implemented yet
+- The CMake project currently builds an executable named `rdbg`
+- The listener expects TLS certificate files at `certs/server.crt` and `certs/server.key`
+
+## Requirements
+
+- CMake 3.20 or newer
+- A C++26-capable compiler
+- OpenSSL
+- Threads
+- Asio
+
+Clipboard tools depend on your platform:
+
+- Linux Wayland: `wl-copy` and `wl-paste`
+- Linux X11: `xclip`
+- macOS: `pbpaste` for reading; clipboard write support is not implemented here
+- Windows: PowerShell `Get-Clipboard` for reading; clipboard write support is not implemented here
+
+## Build
+
+```bash
+cmake -S . -B build
+cmake --build build
+```
+
+The binary is written to `bin/rdbg`.
+
+## Run
+
+Start in interactive mode:
+
+```bash
+./bin/rdbg
+```
+
+Run directly in clipboard listen mode:
+
+```bash
+./bin/rdbg listen
+```
+
+Run directly in clipboard send mode:
+
+```bash
+./bin/rdbg whisper
+```
+
+When prompted:
+
+- `listen` asks for a port number
+- `whisper` asks for `host port`
+
+## TLS Certificates
+
+Clipboard listening loads these files relative to the project directory:
+
+- `certs/server.crt`
+- `certs/server.key`
+
+Create or place valid server certificates there before using listener mode.
+
+## License
+
+This project is licensed under the GNU General Public License v2. See [LICENSE](LICENSE).
