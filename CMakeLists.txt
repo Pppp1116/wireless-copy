@@ -121,8 +121,12 @@ set(PROJECT_WARNING_FLAGS
 if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
     list(APPEND PROJECT_WARNING_FLAGS
         -fcolor-diagnostics
+        -fdiagnostics-format=clang
         -fdiagnostics-show-option
+        -fdiagnostics-show-template-tree
         -fdiagnostics-absolute-paths
+        -fmacro-backtrace-limit=1
+        -ferror-limit=10
         -Wunsafe-buffer-usage
         -Wold-style-cast
         -Wextra-semi
