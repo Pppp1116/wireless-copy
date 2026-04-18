@@ -2,6 +2,23 @@
 
 namespace Whisper {
 
+namespace {
+asio::ip::port_type parse_port(const std::string& value) {
+    int parsed_port = 0;
+    try {
+        parsed_port = std::stoi(value);
+    } catch (const std::exception&) {
+        throw std::runtime_error("invalid port");
+    }
+
+    if (parsed_port < 1 || parsed_port > 65535) {
+        throw std::runtime_error("invalid port");
+    }
+
+    return static_cast<asio::ip::port_type>(parsed_port);
+}
+} // namespace
+
 std::vector<std::string> where_to_whisper() {
     std::vector<std::string> words;
     words.reserve(2);
@@ -23,54 +40,47 @@ std::vector<std::string> where_to_whisper() {
 
 [[nodiscard]] bool send(std::vector<std::string>& words) {
     if (words.size() < 2) {
-        std::cerr << "missing port\n";
+        std::cerr << "missing host or port\n";
         return false;
     }
-
-    int parsed_port = 0;
-    try {
-        parsed_port = std::stoi(words[1]);
-    } catch (const std::exception&) {
-        std::cerr << "invalid port\n";
-        return false;
-    }
-
-    if (parsed_port < 1 || parsed_port > 65535) {
-        std::cerr << "invalid port\n";
-        return false;
-    }
-
-    asio::ip::tcp::endpoint const endpoint(
-        asio::ip::tcp::v4(), static_cast<asio::ip::port_type>(parsed_port)
-    );
 
     try {
         asio::io_context io;
-        asio::ip::tcp::acceptor acceptor(io, endpoint);
-        asio::ip::tcp::socket socket(io);
+        asio::ssl::context ctx(asio::ssl::context::tls_client);
+        ctx.set_default_verify_paths();
+        ctx.set_verify_mode(asio::ssl::verify_none);
 
-        acceptor.accept(socket);
+        asio::ip::tcp::resolver resolver(io);
+        asio::ssl::stream<asio::ip::tcp::socket> stream(io, ctx);
 
-        std::array<char, 1024> buffer{};
-        std::size_t const n = socket.read_some(asio::buffer(buffer));
+        auto const port = parse_port(words[1]);
+        auto const endpoints = resolver.resolve(words[0], std::to_string(port));
 
-        std::cout.write(buffer.data(), static_cast<std::streamsize>(n));
-        std::cout << '\n';
+        asio::connect(stream.next_layer(), endpoints);
+        stream.handshake(asio::ssl::stream_base::client);
 
-        asio::write(socket, asio::buffer(&message, sizeof(message)));
+        std::string payload = message.clipboard_content;
+        payload.push_back('\0');
+        asio::write(stream, asio::buffer(payload));
         return true;
     } catch (const std::exception& e) {
         std::cerr << "network error: " << e.what() << '\n';
         return false;
     }
-} //TODO add calling and need to read clip write ti strucr and write to remote clip
+}
 
 void clipread() {
-    const char* cmd =
-        std::getenv("WAYLAND_DISPLAY") ? "wl-paste -n" : "xclip -selection clipboard -o";
+    message.clipboard_content.clear();
+
+    const char* cmd = read_clipboard();
+    if (cmd == nullptr) {
+        std::cerr << "clipboard read is not supported on this platform\n";
+        return;
+    }
 
     FILE* pipe = popen(cmd, "r");
     if (pipe == nullptr) {
+        perror("clipboard read failed");
         return;
     }
 
@@ -83,24 +93,8 @@ void clipread() {
     pclose(pipe);
 }
 int file_sender(const std::filesystem::path& path) {
-    std::ifstream ffile(path, std::ios::binary);
-    if (!ffile) {
-        return -1;
-    }
-
-    file.name = path.filename().string();
-    file.name_len = Compatability::host_to_big_u64(file.name.size());
-    file.file_size = Compatability::host_to_big_u64(std::filesystem::file_size(path));
-
-    asio::write(socket, asio::buffer(&file.name_len, sizeof(file.name_len)));
-    asio::write(socket, asio::buffer(file.name.data(), file.name.size()));
-    asio::write(socket, asio::buffer(&file.file_size, sizeof(file.file_size)));
-
-    while (ffile.read(file.buffer.data(), file.buffer.size()) || ffile.gcount() > 0) {
-        std::size_t n = static_cast<std::size_t>(ffile.gcount());
-        asio::write(socket, asio::buffer(file.buffer.data(), n));
-    }
-
+    (void)path;
+    std::cerr << "file send is not implemented yet\n";
     return 0;
 }
 
@@ -122,4 +116,4 @@ constexpr uint64_t big_to_host(uint64_t x) {
         return x;
     }
 }
-} // namespace Comlpatability
+} // namespace Compatability

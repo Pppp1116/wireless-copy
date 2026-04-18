@@ -1,5 +1,5 @@
 #include "header.hpp"
-
+#include <fstream>
 #include <cstdio>
 #include <cstdlib>
 #include <string>
@@ -28,31 +28,42 @@ std::vector<std::string> read_words(const std::string& prompt) {
 } // namespace
 
 // listens port
-Message hear(const std::vector<std::string>& words) {
-    if (words.empty()) {
-        std::cerr << "missing port\n";
-        std::exit(1);
-    }
-
+Message hear(asio::ip::port_type listen_port) {
     try {
-        int const port = std::stoi(words[0]);
+        Message received_message{};
 
         asio::io_context io;
 
-        asio::ip::tcp::endpoint const endpoint(asio::ip::tcp::v4(), (asio::ip::port_type)port);
+        asio::ssl::context ctx(asio::ssl::context::tls_server);
+
+        ctx.use_certificate_chain_file("certs/server.crt");
+        ctx.use_private_key_file("certs/server.key", asio::ssl::context::pem);
+
+        
+
+        asio::ip::tcp::endpoint endpoint(asio::ip::tcp::v4(), listen_port);
         asio::ip::tcp::acceptor acceptor(io, endpoint);
 
-        asio::ip::tcp::socket socket(io);
+        asio::ssl::stream<asio::ip::tcp::socket> stream(io, ctx);
 
-        acceptor.accept(socket); // wait for connection
+        std::cout << "listening on port "
+                  << acceptor.local_endpoint().port()
+                  << '\n';
 
-        asio::read(socket, asio::buffer(&message, sizeof(message)));
+        acceptor.accept(stream.next_layer());
 
-        // now message is fully received
-        return message;
+        stream.handshake(asio::ssl::stream_base::server);
+
+        asio::streambuf payload;
+        asio::read_until(stream, payload, '\0');
+
+        std::istream payload_stream(&payload);
+        std::getline(payload_stream, received_message.clipboard_content, '\0');
+
+        return received_message;
     } catch (const std::exception& e) {
-        std::cerr << "invalid port\n";
-        std::exit(1);
+        std::cerr << "hear() failed: " << e.what() << '\n';
+        return {};
     }
 }
 
@@ -71,51 +82,13 @@ std::vector<std::string> where_to_hear() {
     size_t const written = fwrite(text.data(), 1, text.size(), pipe);
     int const status = pclose(pipe);
 
+
     return written == text.size() && status == 0;
 }
 int file_receiver(const std::filesystem::path& output_dir) {
-    uint64_t be_name_len = 0;
-    uint64_t be_file_size = 0;
-
-    // Read metadata
-    asio::read(socket, asio::buffer(&be_name_len, sizeof(be_name_len)));
-    std::uint64_t name_len = Compatability::big_to_host(be_name_len);
-
-    std::string name(name_len, '\0');
-    asio::read(socket, asio::buffer(name.data(), name.size()));
-
-    asio::read(socket, asio::buffer(&be_file_size, sizeof(be_file_size)));
-    std::uint64_t file_size = Compatability::big_to_host(be_file_size);
-
-    // Open output file
-    std::filesystem::path out_path = output_dir / name;
-    std::ofstream ofile(out_path, std::ios::binary);
-    if (!ofile) {
-        return -1;
-    }
-
-    // Read file contents
-    std::array<char, 4096> buffer;
-    std::uint64_t remaining = file_size;
-
-    while (remaining > 0) {
-        std::size_t chunk = static_cast<std::size_t>(
-            std::min<std::uint64_t>(buffer.size(), remaining)
-        );
-
-        asio::read(socket, asio::buffer(buffer.data(), chunk));
-        ofile.write(buffer.data(), chunk);
-
-        if (!ofile) {
-            return -2;
-        }
-
-        remaining -= chunk;
-    }
-
+    (void)output_dir;
+    std::cerr << "file receive is not implemented yet\n";
     return 0;
 }
 
 } // namespace Listen
-
-

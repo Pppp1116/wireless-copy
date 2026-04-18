@@ -29,4 +29,5 @@ void log(const T& text) {
          << '\n';
 }
 
+
 }

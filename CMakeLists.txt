@@ -12,10 +12,11 @@ if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
 endif()
 
 find_package(asio CONFIG QUIET)
+find_package(OpenSSL REQUIRED)
 find_package(Threads REQUIRED)
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
-set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_SOURCE_DIR}/bin")
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/bin")
 
 set(PROJECT_TARGET "${PROJECT_NAME}")
 
@@ -37,13 +38,14 @@ if(ENABLE_CLANG_TIDY)
 
     set(CLANG_TIDY_COMMAND
         "${CLANG_TIDY_EXE}"
-        "-p=${CMAKE_BINARY_DIR}"
+        "-p=${CMAKE_CURRENT_BINARY_DIR}"
         "--use-color"
+        "--format-style=file"
     )
 
-    if(EXISTS "${CMAKE_SOURCE_DIR}/.clang-tidy")
+    if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/.clang-tidy")
         list(APPEND CLANG_TIDY_COMMAND
-            "--config-file=${CMAKE_SOURCE_DIR}/.clang-tidy"
+            "--config-file=${CMAKE_CURRENT_SOURCE_DIR}/.clang-tidy"
         )
     endif()
 
@@ -64,7 +66,7 @@ file(GLOB_RECURSE PROJECT_HEADERS CONFIGURE_DEPENDS
 )
 
 if(NOT PROJECT_SOURCES)
-    message(FATAL_ERROR "No C++ source files were found under ${CMAKE_SOURCE_DIR}/src")
+    message(FATAL_ERROR "No C++ source files were found under ${CMAKE_CURRENT_SOURCE_DIR}/src")
 endif()
 
 add_executable(${PROJECT_TARGET}
@@ -75,20 +77,20 @@ add_executable(${PROJECT_TARGET}
 target_compile_features(${PROJECT_TARGET} PRIVATE cxx_std_26)
 
 target_include_directories(${PROJECT_TARGET} PRIVATE
-    "${CMAKE_SOURCE_DIR}/src"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src"
 )
 
-if(EXISTS "${CMAKE_SOURCE_DIR}/include")
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/include")
     target_include_directories(${PROJECT_TARGET} PRIVATE
-        "${CMAKE_SOURCE_DIR}/include"
+        "${CMAKE_CURRENT_SOURCE_DIR}/include"
     )
 endif()
 
 if(asio_FOUND)
-    target_link_libraries(${PROJECT_TARGET} PRIVATE asio::asio Threads::Threads)
+    target_link_libraries(${PROJECT_TARGET} PRIVATE asio::asio OpenSSL::SSL OpenSSL::Crypto Threads::Threads)
 else()
     message(STATUS "asio package not found via CMake config; assuming standalone header-only Asio is available in the compiler include path")
-    target_link_libraries(${PROJECT_TARGET} PRIVATE Threads::Threads)
+    target_link_libraries(${PROJECT_TARGET} PRIVATE OpenSSL::SSL OpenSSL::Crypto Threads::Threads)
 endif()
 
 set(PROJECT_WARNING_FLAGS
@@ -100,8 +102,11 @@ set(PROJECT_WARNING_FLAGS
     -Wshadow
     -Wformat=2
     -Wformat-security
+    -Wfloat-equal
     -Wmissing-declarations
     -Wmissing-field-initializers
+    -Wmissing-include-dirs
+    -Wmissing-noreturn
     -Wimplicit-fallthrough
     -Wnull-dereference
     -Wundef
@@ -110,6 +115,7 @@ set(PROJECT_WARNING_FLAGS
     -Wuninitialized
     -Werror=format-security
     -Wunused
+    -Wunused-parameter
     -Wunreachable-code
     -Wstrict-aliasing
     -Wredundant-move      
@@ -121,12 +127,17 @@ set(PROJECT_WARNING_FLAGS
 if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
     list(APPEND PROJECT_WARNING_FLAGS
         -fcolor-diagnostics
+        -fcaret-diagnostics
         -fdiagnostics-format=clang
+        -fdiagnostics-parseable-fixits
+        -fdiagnostics-show-note-include-stack
         -fdiagnostics-show-option
         -fdiagnostics-show-template-tree
         -fdiagnostics-absolute-paths
         -fmacro-backtrace-limit=1
         -ferror-limit=10
+        -Wheader-hygiene
+        -Wnewline-eof
         -Wunsafe-buffer-usage
         -Wold-style-cast
         -Wextra-semi
@@ -144,6 +155,17 @@ target_compile_options(${PROJECT_TARGET} PRIVATE
     -fstack-protector-strong
     $<$<CONFIG:Debug>:-fno-omit-frame-pointer>
 )
+
+if(CMAKE_SYSTEM_NAME STREQUAL "Linux" AND CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU")
+    target_compile_options(${PROJECT_TARGET} PRIVATE
+        -fPIE
+    )
+    target_link_options(${PROJECT_TARGET} PRIVATE
+        -pie
+        -Wl,-z,relro
+        -Wl,-z,now
+    )
+endif()
 
 target_compile_definitions(${PROJECT_TARGET} PRIVATE
     $<$<AND:$<CONFIG:Debug>,$<CXX_COMPILER_ID:GNU>>:_GLIBCXX_ASSERTIONS>
