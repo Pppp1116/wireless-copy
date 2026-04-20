@@ -12,7 +12,7 @@ Right now the project supports:
 
 Current limitations:
 
-- The CMake project currently builds an executable named `rdbg`
+
 - The listener expects TLS certificate files at `certs/server.crt` and `certs/server.key`
 - File mode is currently interactive only through menu options `3` and `4`
 
